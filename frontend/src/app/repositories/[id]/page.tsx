@@ -42,7 +42,7 @@ const BlobCard = ({ repositoryId, blobId, capId }) => {
                 tx.object(capId), // AdminCap object
                 tx.pure.address(address), // User or group address
                 tx.pure.vector("u8", fromHex(id)), // ID bytes
-                tx.pure.u64(+viewAccess & (+writeAccess << 1)), // Permissions as a u64
+                tx.pure.u64(+viewAccess | (+writeAccess << 1)), // Permissions as a u64
             ],
         });
 
@@ -190,15 +190,6 @@ export default function RepositoryPage({
 
         fetchBlobIds();
     }, [id, suiClient]);
-
-    const handleSetPermissions = (blobId, address, viewAccess, writeAccess) => {
-        // Add logic to set permissions here
-        console.log("Setting permissions for blob:", blobId);
-        console.log("Address:", address);
-        console.log("View access:", viewAccess);
-        console.log("Write access:", writeAccess);
-        // Implement your permission setting logic here
-    };
 
     return (
         <div className="space-y-4">
