@@ -1,7 +1,8 @@
+#[allow(unused_const)]
+
 module flipper::repository;
 
 use std::string::String;
-use std::vector;
 use sui::dynamic_field as df;
 use flipper::utils::is_prefix;
 use sui::address;
@@ -58,28 +59,30 @@ fun approve_internal(caller: address, id: vector<u8>, repository: &Repository): 
     // Check if the id has the right prefix
     let namespace = namespace(repository);
     if (!is_prefix(namespace, id)) {
-        return false;
+        return false
     };
 
-    let key = address::to_bytes(caller);
+    let mut key = address::to_bytes(caller);
     vector::append(&mut key, id);
 
-    let permissions: u64 = 0x00;
+    let mut permissions: u64 = 0x00;
     if (df::exists_(&repository.id, key)) {
-        permissions |= df::borrow(&repository.id, key);
-    }
+        let user_permissions: u64 = *df::borrow(&repository.id, key);
+        permissions = permissions | user_permissions;
+    };
 
-    permissions & PERMISSION_READ
+    let read_access = permissions & PERMISSION_READ != 0;
+    read_access
 }
 
 entry fun seal_approve(id: vector<u8>, repository: &Repository, ctx: &TxContext) {
     assert!(approve_internal(ctx.sender(), id, repository), ENoAccess);
 }
 
-fun set_permissions(repository: &mut Repository, cap: &mut AdminCap, user_group: address, id: vector<u8>, permissions: u64) {
+public fun set_permissions(repository: &mut Repository, cap: &mut AdminCap, user_group: address, id: vector<u8>, permissions: u64) {
     assert!(cap.repository_id == object::id(repository), EInvalidCap);
 
-    let key = address::to_bytes(user_group);
+    let mut key = address::to_bytes(user_group);
     vector::append(&mut key, id);
 
     df::add(&mut repository.id, key, permissions);
