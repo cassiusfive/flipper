@@ -11,7 +11,7 @@ const EInvalidCap: u64 = 0;
 const ENoAccess: u64 = 1;
 const EDuplicate: u64 = 2;
 
-const BLOB_MARKER: u64 = 3;
+const BLOB_MARKER: u64 = 0xFFFFFF;
 
 const PERMISSION_READ: u64 = 0x01;
 const PERMISSION_WRITE: u64 = 0x02;
