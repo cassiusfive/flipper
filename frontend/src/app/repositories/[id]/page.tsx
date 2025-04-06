@@ -5,7 +5,64 @@ import { Card, TextField } from "@radix-ui/themes";
 import WalrusUpload from "@/EncryptAndUpload";
 import { useEffect, useState } from "react";
 import { useNetworkVariable } from "@/networkConfig";
-import { useCurrentAccount, useSuiClient } from "@mysten/dapp-kit";
+import { Transaction } from "@mysten/sui/transactions";
+import {
+    useCurrentAccount,
+    useSignAndExecuteTransaction,
+    useSuiClient,
+} from "@mysten/dapp-kit";
+import Link from "next/link";
+
+const BlobCard = ({ blobId, onSetPermissions }) => {
+    const [address, setAddress] = useState("");
+    const [viewAccess, setViewAccess] = useState(false);
+    const [writeAccess, setWriteAccess] = useState(false);
+
+    const { mutateAsync: signAndExecuteTransaction } =
+        useSignAndExecuteTransaction();
+
+    const handleSubmit = () => {
+        onSetPermissions(blobId, address, viewAccess, writeAccess);
+    };
+
+    return (
+        <Card className="space-y-2" key={blobId}>
+            <p>{blobId}</p>
+            <TextField.Root
+                placeholder="User address / group"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+            />
+            <div className="flex items-center space-x-4 mt-4">
+                <label className="flex items-center">
+                    <input
+                        type="checkbox"
+                        className="mr-2"
+                        checked={viewAccess}
+                        onChange={(e) => setViewAccess(e.target.checked)}
+                    />
+                    <span>View Access</span>
+                </label>
+                <label className="flex items-center">
+                    <input
+                        type="checkbox"
+                        className="mr-2"
+                        checked={writeAccess}
+                        onChange={(e) => setWriteAccess(e.target.checked)}
+                    />
+                    <span>Write Access</span>
+                </label>
+                <button
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md"
+                    type="button"
+                    onClick={handleSubmit}
+                >
+                    Set Permissions
+                </button>
+            </div>
+        </Card>
+    );
+};
 
 interface RepositoryPageParams {
     id: string;
@@ -30,8 +87,12 @@ export default function RepositoryPage({
     const packageId = useNetworkVariable("packageId");
     const currentAccount = useCurrentAccount();
     const suiClient = useSuiClient();
+    const { mutateAsync: signAndExecuteTransaction } =
+        useSignAndExecuteTransaction();
     const [capId, setCapId] = useState<string | null>(null);
     const [blobIds, setBlobIds] = useState<string[]>([]);
+    const [userAddress, setUserAddress] = useState("");
+    const [groupAddress, setGroupAddress] = useState("");
 
     useEffect(() => {
         const fetchCapId = async () => {
@@ -104,8 +165,23 @@ export default function RepositoryPage({
         fetchBlobIds();
     }, [id, suiClient]);
 
+    const handleSetPermissions = (blobId, address, viewAccess, writeAccess) => {
+        // Add logic to set permissions here
+        console.log("Setting permissions for blob:", blobId);
+        console.log("Address:", address);
+        console.log("View access:", viewAccess);
+        console.log("Write access:", writeAccess);
+        // Implement your permission setting logic here
+    };
+
     return (
         <div className="space-y-4">
+            <div>
+                <p className="font-bold">-- ADMIN VIEW --</p>
+                <Link href={`/repositories/${id}/view`} target="_blank">
+                    regular view
+                </Link>
+            </div>
             <p>
                 Repository ID: <span>{id}</span>
             </p>
@@ -113,26 +189,11 @@ export default function RepositoryPage({
                 <Card className="space-y-2">
                     <h2 className="font-bold">Blobs</h2>
                     {blobIds.map((blobId) => (
-                        <Card className="space-y-2" key={blobId}>
-                            <p>{blobId}</p>
-                            <TextField.Root placeholder="User address / group" />
-                            <div className="flex items-center space-x-4 mt-4">
-                                <label className="flex items-center">
-                                    <input type="checkbox" className="mr-2" />
-                                    <span>View Access</span>
-                                </label>
-                                <label className="flex items-center">
-                                    <input type="checkbox" className="mr-2" />
-                                    <span>Write Access</span>
-                                </label>
-                                <button
-                                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md"
-                                    type="submit"
-                                >
-                                    Set Permissions
-                                </button>
-                            </div>
-                        </Card>
+                        <BlobCard
+                            key={blobId}
+                            blobId={blobId}
+                            onSetPermissions={handleSetPermissions}
+                        />
                     ))}
                 </Card>
                 {capId && (
@@ -142,6 +203,43 @@ export default function RepositoryPage({
                         moduleName="repository"
                     />
                 )}
+                <Card className="p-4 space-y-4">
+                    <h2 className="font-bold">Assign User to Group</h2>
+                    <TextField.Root
+                        placeholder="User address"
+                        value={userAddress}
+                        onChange={(e) => setUserAddress(e.target.value)}
+                    />
+                    <TextField.Root
+                        placeholder="Group address"
+                        value={groupAddress}
+                        onChange={(e) => setGroupAddress(e.target.value)}
+                    />
+                    <button
+                        className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md w-full max-w-60"
+                        type="submit"
+                        onClick={async () => {
+                            const tx = new Transaction();
+
+                            tx.moveCall({
+                                target: `${packageId}::repository::assign_user_to_group`,
+                                arguments: [
+                                    tx.object(id),
+                                    tx.object(capId!),
+                                    tx.pure.address(userAddress.trim()),
+                                    tx.pure.address(groupAddress.trim()),
+                                ],
+                            });
+
+                            tx.setGasBudget(10000000);
+                            await signAndExecuteTransaction({
+                                transaction: tx,
+                            });
+                        }}
+                    >
+                        Assign User to Group
+                    </button>
+                </Card>
             </div>
         </div>
     );
