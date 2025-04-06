@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+"use client";
+
+import React, { useState, useEffect } from "react";
 import { Transaction } from "@mysten/sui/transactions";
 import { useNetworkVariable } from "./networkConfig";
 import { useSignAndExecuteTransaction, useSuiClient } from "@mysten/dapp-kit";
@@ -31,6 +33,9 @@ type WalrusService = {
     aggregatorUrl: string;
 };
 
+// Map storage key in localStorage
+const BLOB_MAP_KEY = "walrus_blob_map";
+
 export function WalrusUpload({
     policyObject,
     cap_id,
@@ -40,6 +45,7 @@ export function WalrusUpload({
     const [info, setInfo] = useState<Data | null>(null);
     const [isUploading, setIsUploading] = useState<boolean>(false);
     const [selectedService, setSelectedService] = useState<string>("service1");
+    const [blobMap, setBlobMap] = useState<Record<string, string>>({});
 
     const SUI_VIEW_TX_URL = `https://suiscan.xyz/testnet/tx`;
     const SUI_VIEW_OBJECT_URL = `https://suiscan.xyz/testnet/object`;
@@ -52,6 +58,23 @@ export function WalrusUpload({
         serverObjectIds: getAllowlistedKeyServers("testnet"),
         verifyKeyServers: false,
     });
+
+    // Load the blob map from localStorage on component mount
+    useEffect(() => {
+        const storedMap = localStorage.getItem(BLOB_MAP_KEY);
+        if (storedMap) {
+            try {
+                setBlobMap(JSON.parse(storedMap));
+            } catch (e) {
+                console.error("Failed to parse stored blob map:", e);
+                // Initialize with empty map if parsing fails
+                localStorage.setItem(BLOB_MAP_KEY, JSON.stringify({}));
+            }
+        } else {
+            // Initialize localStorage with empty map if not exists
+            localStorage.setItem(BLOB_MAP_KEY, JSON.stringify({}));
+        }
+    }, []);
 
     const services: WalrusService[] = [
         {
@@ -132,6 +155,13 @@ export function WalrusUpload({
         setInfo(null);
     };
 
+    // Save blob mapping to localStorage
+    const saveBlobMapping = (id: string, blobId: string) => {
+        const updatedMap = { ...blobMap, [id]: blobId };
+        setBlobMap(updatedMap);
+        localStorage.setItem(BLOB_MAP_KEY, JSON.stringify(updatedMap));
+    };
+
     const handleSubmit = () => {
         setIsUploading(true);
         if (file) {
@@ -154,6 +184,20 @@ export function WalrusUpload({
                             });
                         const storageInfo = await storeBlob(encryptedBytes);
                         displayUpload(storageInfo.info, file.type);
+
+                        // Update the blob mapping with the new entry
+                        let blobId;
+                        if ("alreadyCertified" in storageInfo.info) {
+                            blobId = storageInfo.info.alreadyCertified.blobId;
+                        } else if ("newlyCreated" in storageInfo.info) {
+                            blobId =
+                                storageInfo.info.newlyCreated.blobObject.blobId;
+                        }
+
+                        if (blobId) {
+                            saveBlobMapping(id, blobId);
+                        }
+
                         setIsUploading(false);
                     } else {
                         console.error("Unexpected result type:", typeof result);
