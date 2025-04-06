@@ -106,6 +106,10 @@ public fun set_permissions(repository: &mut Repository, cap: &AdminCap, user_gro
     let mut key = address::to_bytes(user_group);
     vector::append(&mut key, id);
 
+    if (df::exists_(&repository.id, key)) {
+        df::remove<vector<u8>, u64>(&mut repository.id, key);
+    };
+
     df::add(&mut repository.id, key, permissions);
 }
 

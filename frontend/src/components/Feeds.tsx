@@ -108,7 +108,8 @@ export const Feeds: React.FC<FeedsProps> = ({ allowlistId }) => {
                 // Filter for fields with value "3"
                 const blob_ids = fieldResults
                     .filter(
-                        (field) => field.data?.content?.fields?.value === "3",
+                        (field) =>
+                            field.data?.content?.fields?.value === "16777215",
                     )
                     .map((field) => field.data?.content?.fields?.name);
 

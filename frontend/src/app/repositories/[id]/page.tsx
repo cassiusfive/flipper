@@ -176,19 +176,28 @@ export default function RepositoryPage({
             // Filter for fields with value "3"
             console.log(
                 fieldResults.filter(
-                    (field) => field.data?.content?.fields?.value === "3",
+                    (field) =>
+                        field.data?.content?.fields?.value === "16777215",
                 ),
             );
             setBlobIds(
                 fieldResults
                     .filter(
-                        (field) => field.data?.content?.fields?.value === "3",
+                        (field) =>
+                            field.data?.content?.fields?.value === "16777215",
                     )
                     .map((field) => field.data?.content?.fields?.name),
             );
         };
 
+        // Initial fetch
         fetchBlobIds();
+
+        // Set up interval to fetch every 3 seconds
+        const intervalId = setInterval(fetchBlobIds, 3000);
+
+        // Clean up interval on component unmount
+        return () => clearInterval(intervalId);
     }, [id, suiClient]);
 
     return (
