@@ -1,3 +1,5 @@
+import { Card } from "@radix-ui/themes";
+
 interface RepositoryPageParams {
     id: string;
 }
@@ -19,7 +21,10 @@ export default function RepositoryPage({
 
     return (
         <div>
-            {id} {view}
+            <p className="mb-4">
+                {id} {view}
+            </p>
+            <Card></Card>
         </div>
     );
 }
