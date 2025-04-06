@@ -38,7 +38,7 @@ function constructMoveCall(
 ): MoveCallConstructor {
     return (tx: Transaction, id: string) => {
         tx.moveCall({
-            target: `${packageId}::allowlist::seal_approve`,
+            target: `${packageId}::repository::seal_approve`,
             arguments: [
                 tx.pure.vector("u8", fromHex(id)),
                 tx.object(allowlistId),
@@ -139,8 +139,69 @@ export const Feeds: React.FC<FeedsProps> = ({ allowlistId }) => {
     }
 
     const onView = async (blobIds: string[], allowlistId: string) => {
-        // Your existing implementation
-        // (Implementation omitted for brevity but would remain unchanged)
+        if (
+            currentSessionKey &&
+            !currentSessionKey.isExpired() &&
+            currentSessionKey.getAddress() === suiAddress
+        ) {
+            const moveCallConstructor = constructMoveCall(
+                packageId,
+                allowlistId,
+            );
+            downloadAndDecrypt(
+                blobIds,
+                currentSessionKey,
+                suiClient,
+                client,
+                moveCallConstructor,
+                setError,
+                setDecryptedFileUrls,
+                setIsDialogOpen,
+                setReloadKey,
+            );
+            return;
+        }
+
+        setCurrentSessionKey(null);
+
+        const sessionKey = new SessionKey({
+            address: suiAddress,
+            packageId,
+            ttlMin: TTL_MIN,
+        });
+
+        try {
+            signPersonalMessage(
+                {
+                    message: sessionKey.getPersonalMessage(),
+                },
+                {
+                    onSuccess: async (result) => {
+                        await sessionKey.setPersonalMessageSignature(
+                            result.signature,
+                        );
+                        const moveCallConstructor = constructMoveCall(
+                            packageId,
+                            allowlistId,
+                        );
+                        await downloadAndDecrypt(
+                            blobIds,
+                            sessionKey,
+                            suiClient,
+                            client,
+                            moveCallConstructor,
+                            setError,
+                            setDecryptedFileUrls,
+                            setIsDialogOpen,
+                            setReloadKey,
+                        );
+                        setCurrentSessionKey(sessionKey);
+                    },
+                },
+            );
+        } catch (error: any) {
+            console.error("Error:", error);
+        }
     };
 
     // Your existing JSX return

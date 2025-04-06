@@ -12,17 +12,43 @@ import {
     useSuiClient,
 } from "@mysten/dapp-kit";
 import Link from "next/link";
+import { fromHex } from "@mysten/sui/utils";
 
-const BlobCard = ({ blobId, onSetPermissions }) => {
+const BlobCard = ({ repositoryId, blobId, capId }) => {
     const [address, setAddress] = useState("");
     const [viewAccess, setViewAccess] = useState(false);
     const [writeAccess, setWriteAccess] = useState(false);
 
+    const packageId = useNetworkVariable("packageId");
+    const currentAccount = useCurrentAccount();
     const { mutateAsync: signAndExecuteTransaction } =
         useSignAndExecuteTransaction();
 
+    if (!currentAccount?.address) {
+    }
+
     const handleSubmit = () => {
-        onSetPermissions(blobId, address, viewAccess, writeAccess);
+        const blob_map = JSON.parse(localStorage.getItem("walrus_blob_map")!);
+        const id = Object.keys(blob_map).find((id) => blob_map[id] === blobId)!;
+
+        // Create a new transaction block
+        const tx = new Transaction();
+
+        // Set up the call to set_permissions
+        tx.moveCall({
+            target: `${packageId}::repository::set_permissions`,
+            arguments: [
+                tx.object(repositoryId), // Repository object
+                tx.object(capId), // AdminCap object
+                tx.pure.address(address), // User or group address
+                tx.pure.vector("u8", fromHex(id)), // ID bytes
+                tx.pure.u64(+viewAccess & (+writeAccess << 1)), // Permissions as a u64
+            ],
+        });
+
+        signAndExecuteTransaction({
+            transaction: tx,
+        });
     };
 
     return (
@@ -192,7 +218,8 @@ export default function RepositoryPage({
                         <BlobCard
                             key={blobId}
                             blobId={blobId}
-                            onSetPermissions={handleSetPermissions}
+                            repositoryId={id}
+                            capId={capId}
                         />
                     ))}
                 </Card>
