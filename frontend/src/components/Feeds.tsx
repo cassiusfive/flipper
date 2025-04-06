@@ -15,7 +15,7 @@ import {
     Flex,
     Grid,
 } from "@radix-ui/themes";
-import { fromHex } from "@mysten/sui/utils";
+import { fromHex, toHex } from "@mysten/sui/utils";
 import { Transaction } from "@mysten/sui/transactions";
 import { SuiClient } from "@mysten/sui/client";
 import { getAllowlistedKeyServers, SealClient, SessionKey } from "@mysten/seal";
@@ -53,9 +53,6 @@ interface FeedsProps {
 
 export const Feeds: React.FC<FeedsProps> = ({ allowlistId }) => {
     const currentAccount = useCurrentAccount();
-    // Make sure currentAccount exists before accessing its properties
-
-    // Rest of your component code unchanged
     const suiClient = useSuiClient();
     const client = new SealClient({
         suiClient,
@@ -74,7 +71,95 @@ export const Feeds: React.FC<FeedsProps> = ({ allowlistId }) => {
 
     const { mutate: signPersonalMessage } = useSignPersonalMessage();
 
+    const account = useCurrentAccount();
+
+    // Define getFeed function inside useEffect to ensure account exists
     useEffect(() => {
+        if (!account) return; // Don't proceed if account doesn't exist
+
+        const suiAddress = account.address;
+
+        // Define getFeed inside the effect to have access to the latest account/suiAddress
+        async function getFeed() {
+            if (!suiAddress) return;
+
+            const allowlist = await suiClient.getObject({
+                id: allowlistId,
+                options: { showContent: true },
+            });
+
+            const fetchBlobIds = async () => {
+                // First get all dynamic fields
+                const dynamicFields = await suiClient.getDynamicFields({
+                    parentId: allowlistId,
+                });
+
+                // Create an array of promises to fetch all field contents in parallel
+                const fieldPromises = dynamicFields.data.map((obj) =>
+                    suiClient.getObject({
+                        id: obj.objectId,
+                        options: { showContent: true },
+                    }),
+                );
+
+                // Wait for all promises to resolve
+                const fieldResults = await Promise.all(fieldPromises);
+
+                // Filter for fields with value "3"
+                const blob_ids = fieldResults
+                    .filter(
+                        (field) => field.data?.content?.fields?.value === "3",
+                    )
+                    .map((field) => field.data?.content?.fields?.name);
+
+                console.log(fieldResults);
+
+                const filtered_blob_ids = await Promise.all(
+                    blob_ids.map(async (blob_id) => {
+                        const tx = new Transaction();
+                        const blob_map = JSON.parse(
+                            localStorage.getItem("walrus_blob_map")!,
+                        );
+                        const id = Object.keys(blob_map).find(
+                            (id) => blob_map[id] == blob_id,
+                        );
+                        if (!id) return null;
+                        tx.moveCall({
+                            target: `${packageId}::repository::seal_approve`,
+                            arguments: [
+                                tx.pure.vector("u8", fromHex(id)),
+                                tx.object(allowlistId),
+                            ],
+                        });
+                        const res = await suiClient.devInspectTransactionBlock({
+                            sender: suiAddress,
+                            transactionBlock: tx,
+                        });
+                        if (!("error" in res)) return blob_id;
+                        return null;
+                    }),
+                ).then((results) =>
+                    results.filter(
+                        (result): result is string => result !== null,
+                    ),
+                );
+
+                console.log(filtered_blob_ids);
+
+                return filtered_blob_ids;
+            };
+
+            const encryptedObjects = await fetchBlobIds();
+            const fields =
+                (allowlist.data?.content as { fields: any })?.fields || {};
+            const feedData = {
+                allowlistId: allowlistId,
+                allowlistName: fields?.name,
+                blobIds: encryptedObjects,
+            };
+            setFeed(feedData);
+        }
+
         // Call getFeed immediately
         getFeed();
 
@@ -85,60 +170,15 @@ export const Feeds: React.FC<FeedsProps> = ({ allowlistId }) => {
 
         // Cleanup interval on component unmount
         return () => clearInterval(intervalId);
-    }, [allowlistId, suiClient, packageId]);
-
-    const account = useCurrentAccount();
+    }, [allowlistId, suiClient, packageId, account]); // Include account in dependencies
 
     if (!account) {
         return <p>Please login</p>;
     }
 
-    const { address: suiAddress } = account;
-
-    async function getFeed() {
-        // Your existing implementation
-        console.log(allowlistId);
-
-        const allowlist = await suiClient.getObject({
-            id: allowlistId,
-            options: { showContent: true },
-        });
-
-        const fetchBlobIds = async () => {
-            // First get all dynamic fields
-            const dynamicFields = await suiClient.getDynamicFields({
-                parentId: allowlistId,
-            });
-
-            // Create an array of promises to fetch all field contents in parallel
-            const fieldPromises = dynamicFields.data.map((obj) =>
-                suiClient.getObject({
-                    id: obj.objectId,
-                    options: { showContent: true },
-                }),
-            );
-
-            // Wait for all promises to resolve
-            const fieldResults = await Promise.all(fieldPromises);
-
-            // Filter for fields with value "3"
-            return fieldResults
-                .filter((field) => field.data?.content?.fields?.value === "3")
-                .map((field) => field.data?.content?.fields?.name);
-        };
-
-        const encryptedObjects = await fetchBlobIds();
-        const fields =
-            (allowlist.data?.content as { fields: any })?.fields || {};
-        const feedData = {
-            allowlistId: allowlistId,
-            allowlistName: fields?.name,
-            blobIds: encryptedObjects,
-        };
-        setFeed(feedData);
-    }
-
     const onView = async (blobIds: string[], allowlistId: string) => {
+        const suiAddress = account.address;
+
         if (
             currentSessionKey &&
             !currentSessionKey.isExpired() &&
