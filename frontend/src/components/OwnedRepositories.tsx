@@ -12,8 +12,8 @@ export function OwnedRepositories() {
 
     return (
         <Card>
-            <h2 style={{ marginBottom: "1rem" }}>
-                Admin View: Owned Allowlists
+            <h2 className="font-bold" style={{ marginBottom: "1rem" }}>
+                Owned Repositories
             </h2>
             <p style={{ marginBottom: "2rem" }}>
                 These are all the repositories that you have created. Click

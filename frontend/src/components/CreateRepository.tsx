@@ -59,10 +59,12 @@ export function CreateRepository() {
 
     return (
         <Card>
-            <h2 style={{ marginBottom: "1rem" }}>Admin View: Allowlist</h2>
+            <h2 className="font-bold" style={{ marginBottom: "1rem" }}>
+                New Repository
+            </h2>
             <Flex direction="row" gap="2" justify="start">
                 <input
-                    placeholder="Allowlist Name"
+                    placeholder="Repository Name"
                     onChange={(e) => setName(e.target.value)}
                 />
                 <Button
@@ -71,7 +73,7 @@ export function CreateRepository() {
                         createRepository(name);
                     }}
                 >
-                    Create Allowlist
+                    Create Repository
                 </Button>
             </Flex>
         </Card>
